@@ -5,19 +5,19 @@ import { KibanaClient } from "../kibana-client.js";
 export function registerMetricTools(server: McpServer, client: KibanaClient) {
   server.tool(
     "get_service_metrics",
-    "특정 서비스의 CPU/메모리 등 런타임 메트릭 차트를 조회합니다 (agent 종류에 따라 반환 메트릭이 달라짐: JVM은 heap/non-heap/GC/thread, Node.js는 RSS/heap/CPU 등)",
+    "Get runtime metric charts (CPU/memory, etc.) for a service. Returned metrics vary by agent (JVM: heap/non-heap/GC/thread; Node.js: RSS/heap/CPU, etc.)",
     {
-      serviceName: z.string().describe("서비스 이름"),
+      serviceName: z.string().describe("Service name"),
       agentName: z
         .string()
-        .describe("APM agent 종류 (e.g. java, nodejs, go, python, dotnet, ruby)"),
-      start: z.string().describe("조회 시작 시간 (ISO 8601)"),
-      end: z.string().describe("조회 종료 시간 (ISO 8601)"),
-      environment: z.string().optional().describe("환경 필터"),
+        .describe("APM agent type (e.g. java, nodejs, go, python, dotnet, ruby)"),
+      start: z.string().describe("Query start time (ISO 8601)"),
+      end: z.string().describe("Query end time (ISO 8601)"),
+      environment: z.string().optional().describe("Environment filter"),
       serviceRuntimeName: z
         .string()
         .optional()
-        .describe("서비스 런타임 이름 (Kibana 버전에 따라 필요, e.g. OpenJDK)"),
+        .describe("Service runtime name (required on some Kibana versions, e.g. OpenJDK)"),
     },
     async ({ serviceName, agentName, start, end, environment, serviceRuntimeName }) => {
       const data = await client.getServiceMetrics(

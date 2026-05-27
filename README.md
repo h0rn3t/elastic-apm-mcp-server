@@ -1,29 +1,77 @@
 # elastic-apm-mcp-server
 
-Kibana API를 통해 APM 데이터(서비스 목록, 트랜잭션 성능, 에러, 런타임 메트릭)를 조회하는 MCP 서버입니다.
+MCP-сервер для перегляду даних Elastic APM через Kibana API: список сервісів, продуктивність транзакцій, помилки та runtime-метрики.
 
-## 요구사항
+## Вимоги
 
-- Node.js 18 이상
-- Kibana 8.x (Kibana 내부 엔드포인트를 사용하므로 버전에 따라 동작이 달라질 수 있습니다)
+- Node.js 18 або новіший
+- Kibana 8.x (використовуються внутрішні ендпоінти Kibana; поведінка може відрізнятися залежно від версії)
 
-## 설정
+## Установка
 
-Claude Desktop 또는 Claude Code 설정에 다음을 추가합니다. 별도 설치 없이 `npx`로 바로 실행됩니다.
+Є два способи: **глобально** (рекомендовано для постійного використання) або **через `npx`** (без установки, завжди остання версія з npm).
 
-### Claude Code
-
-CLI로 바로 추가:
+### Глобальна установка
 
 ```bash
-claude mcp add elastic-apm \
-  -e KIBANA_URL=http://your-kibana-host:5601 \
-  -e KIBANA_USERNAME=your-username \
-  -e KIBANA_PASSWORD=your-password \
-  -- npx -y elastic-apm-mcp-server
+npm install -g elastic-apm-mcp-server
 ```
 
-또는 `~/.claude/settings.json`에 직접 추가:
+Перевірте, що бінарник у `PATH`:
+
+```bash
+which elastic-apm-mcp-server
+```
+
+Якщо `which` нічого не знаходить, додайте глобальний каталог npm до `PATH` (шлях залежить від ОС):
+
+```bash
+# macOS / Linux — типовий шлях
+export PATH="$(npm config get prefix)/bin:$PATH"
+```
+
+Установка з локального клону репозиторію:
+
+```bash
+git clone https://github.com/h0rn3t/elastic-apm-mcp-server.git
+cd elastic-apm-mcp-server
+npm install
+npm run build
+npm link
+```
+
+### Запуск через npx (без установки)
+
+```bash
+npx -y elastic-apm-mcp-server
+```
+
+## Налаштування MCP
+
+Після установки додайте сервер у конфіг MCP-клієнта. У прикладах нижче замініть URL і облікові дані Kibana на свої.
+
+### Cursor
+
+Файл `~/.cursor/mcp.json` (глобально) або `.cursor/mcp.json` у корені проєкту:
+
+**Глобальна установка:**
+
+```json
+{
+  "mcpServers": {
+    "elastic-apm": {
+      "command": "elastic-apm-mcp-server",
+      "env": {
+        "KIBANA_URL": "http://your-kibana-host:5601",
+        "KIBANA_USERNAME": "your-username",
+        "KIBANA_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+**Через npx:**
 
 ```json
 {
@@ -41,39 +89,95 @@ claude mcp add elastic-apm \
 }
 ```
 
+Після змін перезапустіть Cursor або перезавантажте вікно MCP (Command Palette → «MCP: List Servers» / перезапуск).
+
+### Claude Code
+
+**Глобальна установка** — через CLI:
+
+```bash
+claude mcp add elastic-apm \
+  -e KIBANA_URL=http://your-kibana-host:5601 \
+  -e KIBANA_USERNAME=your-username \
+  -e KIBANA_PASSWORD=your-password \
+  -- elastic-apm-mcp-server
+```
+
+**Через npx:**
+
+```bash
+claude mcp add elastic-apm \
+  -e KIBANA_URL=http://your-kibana-host:5601 \
+  -e KIBANA_USERNAME=your-username \
+  -e KIBANA_PASSWORD=your-password \
+  -- npx -y elastic-apm-mcp-server
+```
+
+Або вручну в `~/.claude/settings.json` (приклад для глобальної установки):
+
+```json
+{
+  "mcpServers": {
+    "elastic-apm": {
+      "command": "elastic-apm-mcp-server",
+      "env": {
+        "KIBANA_URL": "http://your-kibana-host:5601",
+        "KIBANA_USERNAME": "your-username",
+        "KIBANA_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
 ### Claude Desktop
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) 에 동일한 형식으로 추가합니다.
+На macOS додайте той самий блок `mcpServers` у `~/Library/Application Support/Claude/claude_desktop_config.json` — використовуйте `"command": "elastic-apm-mcp-server"` після глобальної установки або `"command": "npx"` з `"args": ["-y", "elastic-apm-mcp-server"]` без неї.
 
-### 환경변수
+### Змінні середовища
 
-| 환경변수 | 필수 | 설명 |
-|----------|------|------|
-| `KIBANA_URL` | O | Kibana 접속 URL |
-| `KIBANA_USERNAME` | O | Kibana 사용자 이름 |
-| `KIBANA_PASSWORD` | O | Kibana 비밀번호 |
+| Змінна | Обов'язкова | Опис |
+|--------|-------------|------|
+| `KIBANA_URL` | Так | URL для доступу до Kibana |
+| `KIBANA_USERNAME` | Так | Ім'я користувача Kibana |
+| `KIBANA_PASSWORD` | Так | Пароль Kibana |
 
-## 제공 도구
+## Доступні інструменти
 
-| 도구 | 설명 |
-|------|------|
-| `list_services` | APM에 등록된 서비스 목록 조회 |
-| `get_service_overview` | 특정 서비스의 트랜잭션 성능과 에러 요약 조회 |
-| `get_transactions` | 특정 서비스의 트랜잭션 성능 통계 조회 |
-| `get_errors` | 특정 서비스의 에러 그룹 조회 |
-| `get_service_metrics` | 특정 서비스의 CPU/메모리 등 런타임 메트릭 조회 (agent 종류별 상이) |
-| `get_transaction_samples` | 특정 트랜잭션의 샘플 트레이스(traceId) 조회, 느린 트랜잭션 필터링 가능 |
-| `get_trace` | trace ID로 트랜잭션 전체 span(워터폴)을 조회하여 병목 구간 파악 |
+| Інструмент | Опис |
+|------------|------|
+| `list_services` | Список сервісів, зареєстрованих в APM |
+| `get_service_overview` | Короткий огляд сервісу: продуктивність транзакцій і помилки |
+| `get_transactions` | Статистика продуктивності транзакцій для сервісу |
+| `get_errors` | Перевірка сервісу на помилки (достатньо `serviceName`; за замовчуванням — останні 24 год) |
+| `check_service_errors` | Те саме, що `get_errors` — зручніший вибір для запитів «перевір на помилки» |
+| `get_service_metrics` | Runtime-метрики (CPU, пам'ять тощо); набір залежить від типу агента |
+| `get_transaction_samples` | Зразки трейсів (traceId) для транзакції; можна відфільтрувати повільні запити |
+| `get_trace` | Повний waterfall span за trace ID для пошуку вузьких місць |
 
-## 사용 예시
+## Приклади використання
 
-MCP 설정 후 Claude에게 자연어로 요청하면 됩니다.
+Після налаштування MCP можна звертатися до Claude природною мовою, наприклад:
 
-- "APM 서비스 목록 보여줘"
-- "auth-service의 최근 1시간 에러 조회해줘"
-- "payment-service 트랜잭션 성능 확인해줘"
-- "payment-service에서 제일 느린 요청 하나 까서 어디서 시간 쓰는지 보여줘"
+- «Покажи список APM-сервісів»
+- «Перевір auth-service на помилки» (MCP викличе `check_service_errors` або `get_errors` з `serviceName: auth-service`)
+- «Є помилки в payment-service за останню годину?» (`serviceName: payment-service`, `period: 1h`)
+- «Перевір продуктивність транзакцій payment-service»
+- «Знайди найповільніший запит у payment-service і покажи, де витрачається час»
 
-## License
+### Перевірка сервісу на помилки
+
+Достатньо вказати **назву сервісу** як у Elastic APM (наприклад `auth-service`). Часовий діапазон необов'язковий:
+
+| Параметр | Опис |
+|----------|------|
+| `serviceName` | Обов'язково — ім'я APM-сервісу |
+| `period` | `15m`, `1h`, `6h`, `24h`, `7d` (за замовчуванням `24h`) |
+| `hours` | Довільний інтервал у годинах (1–168), якщо `period` не підходить |
+| `environment` | Фільтр середовища (`production`, `staging`, …) |
+
+Якщо назва сервісу невідома, спочатку запитайте список: «покажи APM-сервіси» → `list_services`.
+
+## Ліцензія
 
 ISC

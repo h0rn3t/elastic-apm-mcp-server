@@ -6,27 +6,27 @@ import { summarizeTrace } from "../trace-waterfall.js";
 export function registerTraceTools(server: McpServer, client: KibanaClient) {
   server.tool(
     "get_transaction_samples",
-    "Span 상세 조회 / 느린 요청 분석의 1단계 — 특정 트랜잭션의 실제 샘플 trace(traceId/transactionId)를 찾습니다. sampleRangeFrom/To(마이크로초)로 latency 범위를 좁혀 느린 요청만 골라낼 수 있고, 얻은 traceId를 get_trace에 넘겨 span 단위 병목을 분석합니다",
+    "Step 1 of span detail / slow-request analysis — find sample traces (traceId/transactionId) for a transaction. Narrow latency with sampleRangeFrom/To (microseconds) to pick slow requests only; pass the traceId to get_trace for span-level bottleneck analysis",
     {
-      serviceName: z.string().describe("서비스 이름"),
+      serviceName: z.string().describe("Service name"),
       transactionName: z
         .string()
-        .describe("트랜잭션 이름 (get_transactions/get_service_overview의 결과 key)"),
-      start: z.string().describe("조회 시작 시간 (ISO 8601)"),
-      end: z.string().describe("조회 종료 시간 (ISO 8601)"),
+        .describe("Transaction name (key from get_transactions/get_service_overview results)"),
+      start: z.string().describe("Query start time (ISO 8601)"),
+      end: z.string().describe("Query end time (ISO 8601)"),
       transactionType: z
         .string()
         .default("request")
-        .describe("트랜잭션 타입 (e.g. request, messaging)"),
-      environment: z.string().optional().describe("환경 필터"),
+        .describe("Transaction type (e.g. request, messaging)"),
+      environment: z.string().optional().describe("Environment filter"),
       sampleRangeFrom: z
         .string()
         .optional()
-        .describe("샘플 latency 하한 (마이크로초). 느린 트랜잭션만 보려면 지정"),
+        .describe("Sample latency lower bound (microseconds). Set to filter slow transactions only"),
       sampleRangeTo: z
         .string()
         .optional()
-        .describe("샘플 latency 상한 (마이크로초)"),
+        .describe("Sample latency upper bound (microseconds)"),
     },
     async ({
       serviceName,
@@ -56,15 +56,17 @@ export function registerTraceTools(server: McpServer, client: KibanaClient) {
 
   server.tool(
     "get_trace",
-    "Span 상세 조회 / 트랜잭션 병목 분석 — 한 trace의 내부 span 워터폴을 조회합니다. \"느린 요청에서 어디가 병목인지\", \"DB 쿼리/외부 호출/내부 처리 중 어느 구간이 시간을 썼는지\" 분석할 때 사용합니다. 응답은 parent-child 트리(자식은 duration 내림차순) + self time 기준 상위 5개 병목(topBottlenecks)으로 자동 가공되어 반환됩니다. traceId는 get_transaction_samples로 얻으세요",
+    'Span detail / transaction bottleneck analysis — fetch the span waterfall for one trace. Use to answer "where is the bottleneck in a slow request?" or "which segment spent time (DB, external call, internal)?". Response is a parent-child tree (children sorted by duration desc) plus top 5 bottlenecks by self time (topBottlenecks). Obtain traceId from get_transaction_samples',
     {
-      traceId: z.string().describe("트레이스 ID"),
-      start: z.string().describe("조회 시작 시간 (ISO 8601)"),
-      end: z.string().describe("조회 종료 시간 (ISO 8601)"),
+      traceId: z.string().describe("Trace ID"),
+      start: z.string().describe("Query start time (ISO 8601)"),
+      end: z.string().describe("Query end time (ISO 8601)"),
       entryTransactionId: z
         .string()
         .optional()
-        .describe("진입 트랜잭션 ID (Kibana 버전에 따라 필요, get_transaction_samples 결과의 transactionId)"),
+        .describe(
+          "Entry transaction ID (required on some Kibana versions; transactionId from get_transaction_samples)"
+        ),
     },
     async ({ traceId, start, end, entryTransactionId }) => {
       const data = await client.getTrace(traceId, start, end, entryTransactionId);

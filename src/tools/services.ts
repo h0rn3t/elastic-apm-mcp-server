@@ -5,11 +5,11 @@ import { KibanaClient } from "../kibana-client.js";
 export function registerServiceTools(server: McpServer, client: KibanaClient) {
   server.tool(
     "list_services",
-    "APM에 등록된 서비스 목록을 조회합니다 (latency는 항상 avg, 백분위는 get_service_overview/get_transactions 사용)",
+    "List services registered in APM (latency is always avg; use get_service_overview/get_transactions for percentiles)",
     {
-      start: z.string().describe("조회 시작 시간 (ISO 8601, e.g. 2026-04-01T00:00:00Z)"),
-      end: z.string().describe("조회 종료 시간 (ISO 8601)"),
-      environment: z.string().optional().describe("환경 필터 (e.g. production, staging)"),
+      start: z.string().describe("Query start time (ISO 8601, e.g. 2026-04-01T00:00:00Z)"),
+      end: z.string().describe("Query end time (ISO 8601)"),
+      environment: z.string().optional().describe("Environment filter (e.g. production, staging)"),
     },
     async ({ start, end, environment }) => {
       const data = await client.getServices(start, end, environment);
@@ -21,17 +21,17 @@ export function registerServiceTools(server: McpServer, client: KibanaClient) {
 
   server.tool(
     "get_service_overview",
-    "특정 서비스의 트랜잭션 성능과 에러 요약을 조회합니다",
+    "Get transaction performance and error summary for a specific service",
     {
-      serviceName: z.string().describe("서비스 이름"),
-      start: z.string().describe("조회 시작 시간 (ISO 8601)"),
-      end: z.string().describe("조회 종료 시간 (ISO 8601)"),
-      environment: z.string().optional().describe("환경 필터"),
+      serviceName: z.string().describe("Service name"),
+      start: z.string().describe("Query start time (ISO 8601)"),
+      end: z.string().describe("Query end time (ISO 8601)"),
+      environment: z.string().optional().describe("Environment filter"),
       latencyAggregationType: z
         .string()
         .default("avg")
         .describe(
-          "latency 집계 타입 (avg, p95, p99). p95/p99는 샘플링된 raw transaction 기반이라 트랜잭션 수가 적게 보일 수 있음"
+          "Latency aggregation (avg, p95, p99). p95/p99 use sampled raw transactions, so transaction counts may appear lower"
         ),
     },
     async ({ serviceName, start, end, environment, latencyAggregationType }) => {

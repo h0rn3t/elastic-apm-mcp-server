@@ -5,21 +5,21 @@ import { KibanaClient } from "../kibana-client.js";
 export function registerTransactionTools(server: McpServer, client: KibanaClient) {
   server.tool(
     "get_transactions",
-    "특정 서비스의 트랜잭션 성능 통계를 조회합니다",
+    "Get transaction performance statistics for a specific service",
     {
-      serviceName: z.string().describe("서비스 이름"),
-      start: z.string().describe("조회 시작 시간 (ISO 8601)"),
-      end: z.string().describe("조회 종료 시간 (ISO 8601)"),
+      serviceName: z.string().describe("Service name"),
+      start: z.string().describe("Query start time (ISO 8601)"),
+      end: z.string().describe("Query end time (ISO 8601)"),
       transactionType: z
         .string()
         .default("request")
-        .describe("트랜잭션 타입 (e.g. request, messaging)"),
-      environment: z.string().optional().describe("환경 필터"),
+        .describe("Transaction type (e.g. request, messaging)"),
+      environment: z.string().optional().describe("Environment filter"),
       latencyAggregationType: z
         .string()
         .default("avg")
         .describe(
-          "latency 집계 타입 (avg, p95, p99). p95/p99는 샘플링된 raw transaction 기반이라 트랜잭션 수가 적게 보일 수 있음"
+          "Latency aggregation (avg, p95, p99). p95/p99 use sampled raw transactions, so transaction counts may appear lower"
         ),
     },
     async ({ serviceName, start, end, transactionType, environment, latencyAggregationType }) => {
