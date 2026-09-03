@@ -1,8 +1,10 @@
 package kibana
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,6 +64,10 @@ func (c *Client) request(path string, params url.Values, out any) error {
 	if err != nil {
 		return err
 	}
+	return c.do(req, out)
+}
+
+func (c *Client) do(req *http.Request, out any) error {
 	req.Header = c.headers.Clone()
 
 	resp, err := c.httpClient.Do(req)
@@ -83,8 +89,8 @@ func (c *Client) request(path string, params url.Values, out any) error {
 	return json.Unmarshal(body, out)
 }
 
-// GetServices повертає список APM-сервісів.
-func (c *Client) GetServices(start, end, environment string) (json.RawMessage, error) {
+// GetServices повертає список APM-сервісів. kuery — необов'язковий KQL-фільтр.
+func (c *Client) GetServices(start, end, environment, kuery string) (json.RawMessage, error) {
 	params := url.Values{
 		"start":              {start},
 		"end":                {end},
@@ -92,7 +98,7 @@ func (c *Client) GetServices(start, end, environment string) (json.RawMessage, e
 		"probability":        {"1"},
 		"documentType":       {"transactionMetric"},
 		"rollupInterval":     {"60m"},
-		"kuery":              {""},
+		"kuery":              {kuery},
 		"useDurationSummary": {"true"},
 	}
 	var out json.RawMessage
@@ -107,7 +113,8 @@ type ServiceOverview struct {
 }
 
 // GetServiceOverview завантажує транзакції та помилки паралельно.
-func (c *Client) GetServiceOverview(serviceName, start, end, environment, latencyAggregationType string) (*ServiceOverview, error) {
+// kuery — необов'язковий KQL-фільтр, застосовується до обох запитів.
+func (c *Client) GetServiceOverview(serviceName, start, end, environment, latencyAggregationType, kuery string) (*ServiceOverview, error) {
 	if latencyAggregationType == "" {
 		latencyAggregationType = "avg"
 	}
@@ -121,7 +128,7 @@ func (c *Client) GetServiceOverview(serviceName, start, end, environment, latenc
 		"environment":            {env},
 		"transactionType":        {"request"},
 		"latencyAggregationType": {latencyAggregationType},
-		"kuery":                  {""},
+		"kuery":                  {kuery},
 		"documentType":           {"transactionEvent"},
 		"rollupInterval":         {"60m"},
 	}
@@ -134,7 +141,7 @@ func (c *Client) GetServiceOverview(serviceName, start, end, environment, latenc
 		"start":       {start},
 		"end":         {end},
 		"environment": {env},
-		"kuery":       {""},
+		"kuery":       {kuery},
 	}
 
 	var overview ServiceOverview
@@ -161,13 +168,13 @@ func (c *Client) GetServiceOverview(serviceName, start, end, environment, latenc
 	return &overview, nil
 }
 
-// GetErrors повертає групи помилок сервісу.
-func (c *Client) GetErrors(serviceName, start, end, environment string) (json.RawMessage, error) {
+// GetErrors повертає групи помилок сервісу. kuery — необов'язковий KQL-фільтр.
+func (c *Client) GetErrors(serviceName, start, end, environment, kuery string) (json.RawMessage, error) {
 	params := url.Values{
 		"start":       {start},
 		"end":         {end},
 		"environment": {envOrAll(environment)},
-		"kuery":       {""},
+		"kuery":       {kuery},
 	}
 	path := "/internal/apm/services/" + url.PathEscape(serviceName) + "/errors/groups/main_statistics"
 	var out json.RawMessage
@@ -175,14 +182,14 @@ func (c *Client) GetErrors(serviceName, start, end, environment string) (json.Ra
 	return out, err
 }
 
-// GetServiceMetrics повертає runtime-метрики сервісу.
-func (c *Client) GetServiceMetrics(serviceName, agentName, start, end, environment, serviceRuntimeName string) (json.RawMessage, error) {
+// GetServiceMetrics повертає runtime-метрики сервісу. kuery — необов'язковий KQL-фільтр.
+func (c *Client) GetServiceMetrics(serviceName, agentName, start, end, environment, serviceRuntimeName, kuery string) (json.RawMessage, error) {
 	params := url.Values{
 		"start":       {start},
 		"end":         {end},
 		"agentName":   {agentName},
 		"environment": {envOrAll(environment)},
-		"kuery":       {""},
+		"kuery":       {kuery},
 	}
 	if serviceRuntimeName != "" {
 		params.Set("serviceRuntimeName", serviceRuntimeName)
@@ -193,8 +200,8 @@ func (c *Client) GetServiceMetrics(serviceName, agentName, start, end, environme
 	return out, err
 }
 
-// GetTransactions повертає статистику транзакцій.
-func (c *Client) GetTransactions(serviceName, start, end, transactionType, environment, latencyAggregationType string) (json.RawMessage, error) {
+// GetTransactions повертає статистику транзакцій. kuery — необов'язковий KQL-фільтр.
+func (c *Client) GetTransactions(serviceName, start, end, transactionType, environment, latencyAggregationType, kuery string) (json.RawMessage, error) {
 	if transactionType == "" {
 		transactionType = "request"
 	}
@@ -210,7 +217,7 @@ func (c *Client) GetTransactions(serviceName, start, end, transactionType, envir
 		"latencyAggregationType": {latencyAggregationType},
 		"documentType":           {"transactionEvent"},
 		"rollupInterval":         {"60m"},
-		"kuery":                  {""},
+		"kuery":                  {kuery},
 	}
 	if isAvg {
 		params.Set("documentType", "transactionMetric")
@@ -223,7 +230,8 @@ func (c *Client) GetTransactions(serviceName, start, end, transactionType, envir
 }
 
 // GetTransactionSamples повертає зразки трейсів для транзакції.
-func (c *Client) GetTransactionSamples(serviceName, transactionName, start, end, transactionType, environment, sampleRangeFrom, sampleRangeTo string) (json.RawMessage, error) {
+// kuery — необов'язковий KQL-фільтр, напр. `http.response.status_code : 403`.
+func (c *Client) GetTransactionSamples(serviceName, transactionName, start, end, transactionType, environment, sampleRangeFrom, sampleRangeTo, kuery string) (json.RawMessage, error) {
 	if transactionType == "" {
 		transactionType = "request"
 	}
@@ -233,7 +241,7 @@ func (c *Client) GetTransactionSamples(serviceName, transactionName, start, end,
 		"transactionType": {transactionType},
 		"transactionName": {transactionName},
 		"environment":     {envOrAll(environment)},
-		"kuery":           {""},
+		"kuery":           {kuery},
 	}
 	if sampleRangeFrom != "" {
 		params.Set("sampleRangeFrom", sampleRangeFrom)
@@ -260,4 +268,82 @@ func (c *Client) GetTrace(traceID, start, end, entryTransactionID string) (json.
 	var out json.RawMessage
 	err := c.request(path, params, &out)
 	return out, err
+}
+
+// Межі size для _search: внутрішній APM API ліміту не має, але відповідь
+// повертається в контекст LLM, тому дефолт малий, а максимум обмежений.
+const (
+	DefaultSearchSize = 10
+	MaxSearchSize     = 1000
+)
+
+// indexAllowed — символи, допустимі в назві індексу або патерні, включно з
+// cross-cluster формою `cluster:index`. Усе інше — насамперед "/", "?", "#" —
+// могло б вивести запит за межі `<index>/_search` на інший ендпоінт ES.
+const indexAllowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.*,:+"
+
+// SearchRequest — запит до Elasticsearch `_search` через Kibana console proxy.
+// Index у тіло не потрапляє: він стає частиною шляху.
+type SearchRequest struct {
+	Index  string   `json:"-"`
+	Query  any      `json:"query,omitempty"`
+	Source []string `json:"_source,omitempty"`
+	Size   int      `json:"size"`
+	Sort   any      `json:"sort,omitempty"`
+}
+
+func validateIndex(index string) error {
+	switch {
+	case index == "":
+		return errors.New("index must not be empty")
+	case len(index) > 255:
+		return fmt.Errorf("index must be at most 255 characters, got %d", len(index))
+	case strings.Contains(index, ".."):
+		return fmt.Errorf("index %q must not contain %q", index, "..")
+	}
+	if strings.ContainsFunc(index, func(r rune) bool { return !strings.ContainsRune(indexAllowed, r) }) {
+		return fmt.Errorf("index %q may contain only letters, digits and -_.*,:+", index)
+	}
+	return nil
+}
+
+// Search виконує `<index>/_search` в Elasticsearch через Kibana console proxy
+// (`/api/console/proxy`) — тими самими креденшелами, що й решта клієнта.
+// Це escape hatch для полів, яких внутрішній APM API не віддає: error.culprit,
+// error.exception[].stacktrace[], довільні _source-поля.
+func (c *Client) Search(r SearchRequest) (json.RawMessage, error) {
+	if err := validateIndex(r.Index); err != nil {
+		return nil, err
+	}
+	switch {
+	case r.Size == 0:
+		r.Size = DefaultSearchSize
+	case r.Size < 0 || r.Size > MaxSearchSize:
+		return nil, fmt.Errorf("size must be between 1 and %d, got %d", MaxSearchSize, r.Size)
+	}
+
+	// expand_wildcards=open,hidden: backing індекси data streams (.ds-*) —
+	// приховані, і без цього патерн на кшталт ".ds-*apm*" не розкривається ні в що.
+	var out json.RawMessage
+	err := c.consoleProxy(r.Index+"/_search?expand_wildcards=open,hidden", r, &out)
+	return out, err
+}
+
+// consoleProxy надсилає POST через Kibana console proxy до Elasticsearch.
+// esPath — шлях у ES; він урл-енкодиться як параметр `path`.
+func (c *Client) consoleProxy(esPath string, body, out any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	params := url.Values{
+		"path":   {esPath},
+		"method": {http.MethodPost},
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/api/console/proxy?"+params.Encode(), bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	return c.do(req, out)
 }

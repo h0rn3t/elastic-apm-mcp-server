@@ -5,7 +5,16 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// TimeArgs — часові параметри запиту.
+// kueryDescription — спільний опис KQL-фільтра. Kibana приймає kuery в кожному
+// з внутрішніх APM-ендпоінтів, тому опис один для всіх інструментів.
+const kueryDescription = `KQL filter applied server-side by Elasticsearch, e.g. 'http.response.status_code : 403', 'http.request.headers.True-Client-Ip : "95.67.96.24"', 'transaction.outcome : failure', 'service.environment : production and http.response.status_code >= 500'. Combine terms with and/or/not; quote values containing spaces, dots or colons. Use this instead of fetching everything and filtering afterwards`
+
+// kueryParam додає параметр kuery до схеми інструмента.
+func kueryParam() mcp.ToolOption {
+	return mcp.WithString("kuery", mcp.Description(kueryDescription))
+}
+
+// TimeArgs — часові та фільтрувальні параметри запиту.
 type TimeArgs struct {
 	Start       string
 	End         string
@@ -14,6 +23,7 @@ type TimeArgs struct {
 	Hours       float64
 	HoursSet    bool
 	Environment string
+	Kuery       string
 }
 
 func readTimeArgs(req mcp.CallToolRequest) TimeArgs {
@@ -22,6 +32,7 @@ func readTimeArgs(req mcp.CallToolRequest) TimeArgs {
 		Start:       req.GetString("start", ""),
 		End:         req.GetString("end", ""),
 		Environment: req.GetString("environment", ""),
+		Kuery:       req.GetString("kuery", ""),
 	}
 	if period != "" {
 		args.Period = timerange.Period(period)

@@ -114,16 +114,16 @@ func pct(part, whole int64) float64 {
 }
 
 type renderedNode struct {
-	Kind      string          `json:"kind"`
-	Service   string          `json:"service"`
-	Name      string          `json:"name"`
-	Duration  int64           `json:"duration_ms"`
-	Self      int64           `json:"self_ms"`
-	PctOfRoot float64         `json:"pctOfRoot"`
-	Type      string          `json:"type,omitempty"`
-	Subtype   string          `json:"subtype,omitempty"`
-	Resource  string          `json:"resource,omitempty"`
-	Children  []renderedNode  `json:"children,omitempty"`
+	Kind      string         `json:"kind"`
+	Service   string         `json:"service"`
+	Name      string         `json:"name"`
+	Duration  int64          `json:"duration_ms"`
+	Self      int64          `json:"self_ms"`
+	PctOfRoot float64        `json:"pctOfRoot"`
+	Type      string         `json:"type,omitempty"`
+	Subtype   string         `json:"subtype,omitempty"`
+	Resource  string         `json:"resource,omitempty"`
+	Children  []renderedNode `json:"children,omitempty"`
 }
 
 func renderNode(n *traceNode, rootUs int64) renderedNode {
@@ -196,10 +196,7 @@ func SummarizeTrace(raw json.RawMessage) (json.RawMessage, error) {
 		for _, c := range n.Children {
 			childSum += c.DurationUs
 		}
-		n.SelfUs = n.DurationUs - childSum
-		if n.SelfUs < 0 {
-			n.SelfUs = 0
-		}
+		n.SelfUs = max(n.DurationUs-childSum, 0)
 	}
 	for _, r := range roots {
 		finalize(r)

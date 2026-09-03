@@ -16,7 +16,7 @@ func registerTraceTools(s *server.MCPServer, client *kibana.Client) {
 
 func registerGetTransactionSamples(s *server.MCPServer, client *kibana.Client) {
 	tool := mcp.NewTool("get_transaction_samples",
-		mcp.WithDescription("Step 1 of span detail / slow-request analysis — find sample traces (traceId/transactionId) for a transaction. Narrow latency with sampleRangeFrom/To (microseconds) to pick slow requests only; pass the traceId to get_trace for span-level bottleneck analysis"),
+		mcp.WithDescription("Step 1 of span detail / slow-request analysis — find sample traces for a transaction. Each sample carries traceId, transactionId, http.response.status_code, transaction.outcome, url.path and duration, so \"which of these requests returned 403?\" is answered here without calling get_trace. Narrow with kuery (e.g. 'http.response.status_code : 403') or latency with sampleRangeFrom/To (microseconds); pass a traceId to get_trace only for span-level bottleneck analysis"),
 		mcp.WithString("serviceName",
 			mcp.Description("Service name"),
 			mcp.Required(),
@@ -45,6 +45,7 @@ func registerGetTransactionSamples(s *server.MCPServer, client *kibana.Client) {
 		mcp.WithString("sampleRangeTo",
 			mcp.Description("Sample latency upper bound (microseconds)"),
 		),
+		kueryParam(),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
@@ -59,19 +60,19 @@ func registerGetTransactionSamples(s *server.MCPServer, client *kibana.Client) {
 		if serviceName == "" || transactionName == "" || start == "" || end == "" {
 			return mcp.NewToolResultError("serviceName, transactionName, start and end are required"), nil
 		}
-		data, err := client.GetTransactionSamples(
-			serviceName, transactionName, start, end,
-			req.GetString("transactionType", "request"),
-			req.GetString("environment", ""),
-			req.GetString("sampleRangeFrom", ""),
-			req.GetString("sampleRangeTo", ""),
-		)
+		text, err := FetchTransactionSamples(client, SampleParams{
+			Service:         serviceName,
+			Transaction:     transactionName,
+			Start:           start,
+			End:             end,
+			TransactionType: req.GetString("transactionType", "request"),
+			Environment:     req.GetString("environment", ""),
+			Kuery:           req.GetString("kuery", ""),
+			SampleRangeFrom: req.GetString("sampleRangeFrom", ""),
+			SampleRangeTo:   req.GetString("sampleRangeTo", ""),
+		})
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("get transaction samples: %v", err)), nil
-		}
-		text, err := formatRawJSON(data)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
 		}
 		return mcp.NewToolResultText(text), nil
 	})

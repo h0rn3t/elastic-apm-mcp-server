@@ -12,4 +12,5 @@ func RegisterAll(s *server.MCPServer, client *kibana.Client) {
 	registerTransactionTools(s, client)
 	registerMetricTools(s, client)
 	registerTraceTools(s, client)
+	registerSearchTools(s, client)
 }

@@ -34,6 +34,7 @@ func registerMetricTools(s *server.MCPServer, client *kibana.Client) {
 		mcp.WithString("serviceRuntimeName",
 			mcp.Description("Service runtime name (required on some Kibana versions, e.g. OpenJDK)"),
 		),
+		kueryParam(),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
@@ -52,6 +53,7 @@ func registerMetricTools(s *server.MCPServer, client *kibana.Client) {
 			serviceName, agentName, start, end,
 			req.GetString("environment", ""),
 			req.GetString("serviceRuntimeName", ""),
+			req.GetString("kuery", ""),
 		)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("get metrics: %v", err)), nil

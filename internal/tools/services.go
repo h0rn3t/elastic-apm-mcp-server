@@ -28,6 +28,7 @@ func registerListServices(s *server.MCPServer, client *kibana.Client) {
 		mcp.WithString("environment",
 			mcp.Description("Environment filter (e.g. production, staging)"),
 		),
+		kueryParam(),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
@@ -40,7 +41,7 @@ func registerListServices(s *server.MCPServer, client *kibana.Client) {
 		if start == "" || end == "" {
 			return mcp.NewToolResultError("start and end are required"), nil
 		}
-		data, err := client.GetServices(start, end, req.GetString("environment", ""))
+		data, err := client.GetServices(start, end, req.GetString("environment", ""), req.GetString("kuery", ""))
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("list services: %v", err)), nil
 		}
@@ -73,6 +74,7 @@ func registerGetServiceOverview(s *server.MCPServer, client *kibana.Client) {
 		mcp.WithString("latencyAggregationType",
 			mcp.Description("Latency aggregation (avg, p95, p99). p95/p99 use sampled raw transactions, so transaction counts may appear lower"),
 		),
+		kueryParam(),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
@@ -87,7 +89,7 @@ func registerGetServiceOverview(s *server.MCPServer, client *kibana.Client) {
 			return mcp.NewToolResultError("serviceName, start and end are required"), nil
 		}
 		latency := req.GetString("latencyAggregationType", "avg")
-		data, err := client.GetServiceOverview(serviceName, start, end, req.GetString("environment", ""), latency)
+		data, err := client.GetServiceOverview(serviceName, start, end, req.GetString("environment", ""), latency, req.GetString("kuery", ""))
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("service overview: %v", err)), nil
 		}

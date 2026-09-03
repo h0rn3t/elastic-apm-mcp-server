@@ -42,12 +42,22 @@ Checking a service for errors (most common request):
 - For "last hour" / "past 6 hours" set period to 1h or 6h, or use hours: 3.
 - If the service name is unknown, call list_services first, then get_errors.
 - get_service_overview also returns an error summary plus transaction stats for one service.
+- For the culprit, exception chain and stacktrace of one group, pass its errorGroups[].groupId to get_error_detail.
 
 Other tools:
 - list_services — all APM services in a time range
 - get_transactions — transaction latency stats (avg / p95 / p99)
 - get_service_metrics — CPU/memory (depends on agent type)
-- get_transaction_samples + get_trace — slow request / span bottleneck analysis (2-step)
+- get_transaction_samples — samples with status code, outcome, url.path and duration
+- get_trace — span waterfall for one traceId; only needed for bottleneck analysis
+- get_error_detail — culprit, exception chain, stacktrace of one error group
+- search_raw — raw Elasticsearch _search; the escape hatch for fields no other tool returns
+
+Narrowing results — every tool except get_trace and search_raw takes kuery, a KQL filter
+Elasticsearch applies server-side. Prefer it over fetching everything and filtering afterwards:
+- kuery: 'http.response.status_code : 403' — which requests failed
+- kuery: 'http.request.headers.True-Client-Ip : "95.67.96.24"' — one client's traffic
+- kuery: 'transaction.outcome : failure and transaction.duration.us > 5000000'
 
 Time ranges: ISO 8601 start/end, or period (15m, 1h, 6h, 24h, 7d), or hours (1–168).`),
 	)

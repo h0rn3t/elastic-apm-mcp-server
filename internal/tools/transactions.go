@@ -33,6 +33,7 @@ func registerTransactionTools(s *server.MCPServer, client *kibana.Client) {
 		mcp.WithString("latencyAggregationType",
 			mcp.Description("Latency aggregation (avg, p95, p99). p95/p99 use sampled raw transactions, so transaction counts may appear lower"),
 		),
+		kueryParam(),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
@@ -48,7 +49,7 @@ func registerTransactionTools(s *server.MCPServer, client *kibana.Client) {
 		}
 		txType := req.GetString("transactionType", "request")
 		latency := req.GetString("latencyAggregationType", "avg")
-		data, err := client.GetTransactions(serviceName, start, end, txType, req.GetString("environment", ""), latency)
+		data, err := client.GetTransactions(serviceName, start, end, txType, req.GetString("environment", ""), latency, req.GetString("kuery", ""))
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("get transactions: %v", err)), nil
 		}

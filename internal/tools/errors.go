@@ -33,6 +33,7 @@ func errorToolParams() []mcp.ToolOption {
 		mcp.WithString("environment",
 			mcp.Description("Environment filter, e.g. production, staging"),
 		),
+		kueryParam(),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
@@ -52,6 +53,8 @@ func registerErrorTools(s *server.MCPServer, client *kibana.Client) {
 		append([]mcp.ToolOption{mcp.WithDescription(`Alias for get_errors — same behavior. Prefer this when the user explicitly asks to "check" or "verify" a service for errors.`)}, errorToolParams()...)...,
 	)
 	s.AddTool(checkErrors, handler)
+
+	registerErrorDetailTool(s, client)
 }
 
 func fetchServiceErrorsMCP(client *kibana.Client, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -72,7 +75,7 @@ func fetchServiceErrorsMCP(client *kibana.Client, req mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	raw, err := client.GetErrors(serviceName, rangeResolved.Start, rangeResolved.End, args.Environment)
+	raw, err := client.GetErrors(serviceName, rangeResolved.Start, rangeResolved.End, args.Environment, args.Kuery)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("get errors: %v", err)), nil
 	}
@@ -91,7 +94,7 @@ func FetchServiceErrorsCLI(client *kibana.Client, serviceName string, args TimeA
 	if err != nil {
 		return "", err
 	}
-	raw, err := client.GetErrors(serviceName, rangeResolved.Start, rangeResolved.End, args.Environment)
+	raw, err := client.GetErrors(serviceName, rangeResolved.Start, rangeResolved.End, args.Environment, args.Kuery)
 	if err != nil {
 		return "", err
 	}

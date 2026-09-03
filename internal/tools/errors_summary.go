@@ -8,17 +8,18 @@ import (
 )
 
 type errorGroupRow struct {
-	Name          string  `json:"name"`
-	Message       string  `json:"message,omitempty"`
-	Type          string  `json:"type,omitempty"`
-	Occurrences   *int    `json:"occurrences,omitempty"`
-	UsersAffected *int    `json:"usersAffected,omitempty"`
-	LastSeen      string  `json:"lastSeen,omitempty"`
+	Name          string `json:"name"`
+	GroupID       string `json:"groupId,omitempty"`
+	Message       string `json:"message,omitempty"`
+	Type          string `json:"type,omitempty"`
+	Occurrences   *int   `json:"occurrences,omitempty"`
+	UsersAffected *int   `json:"usersAffected,omitempty"`
+	LastSeen      string `json:"lastSeen,omitempty"`
 }
 
 type serviceErrorsSummary struct {
-	Service     string `json:"service"`
-	TimeRange   struct {
+	Service   string `json:"service"`
+	TimeRange struct {
 		Start string `json:"start"`
 		End   string `json:"end"`
 		Label string `json:"label"`
@@ -92,6 +93,13 @@ func anySlice(v any) []any {
 	return nil
 }
 
+// obj повертає вкладений об'єкт або nil-мапу, індексування якої безпечне —
+// це дозволяє читати глибокі шляхи як obj(obj(src["http"])["response"]).
+func obj(v any) map[string]any {
+	m, _ := v.(map[string]any)
+	return m
+}
+
 func toMapSlice(items []any) []map[string]any {
 	out := make([]map[string]any, 0, len(items))
 	for _, item := range items {
@@ -124,6 +132,7 @@ func mapGroup(g map[string]any) *errorGroupRow {
 
 	row := &errorGroupRow{
 		Name:     name,
+		GroupID:  pickString(g["groupId"], g["group_id"], g["id"], err["grouping_key"]),
 		Message:  pickString(g["message"], exc["message"], err["message"]),
 		Type:     pickString(g["type"], exc["type"], err["type"]),
 		LastSeen: pickString(g["lastSeen"], g["latestOccurrenceAt"], g["@timestamp"]),
@@ -174,7 +183,7 @@ func SummarizeServiceErrors(serviceName string, tr timerange.Resolved, raw json.
 	if len(rows) == 0 {
 		summary.Hint = "No error groups in this time range. Try a wider period (e.g. 7d) or list_services to confirm the exact service name."
 	} else {
-		summary.Hint = "For details on a specific error, open APM → Errors in Kibana or use get_service_overview."
+		summary.Hint = "For the culprit, exception chain and stacktrace of one group, call get_error_detail with its groupId."
 	}
 	return summary
 }
