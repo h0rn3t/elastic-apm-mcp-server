@@ -3,12 +3,20 @@ package tools
 import (
 	"cmp"
 	"encoding/json"
+	"fmt"
 
 	"github.com/h0rn3t/elastic-apm-mcp-server/internal/kibana"
 )
 
 // transactionIndex — транзакції в data streams 8.x і в legacy-індексах 7.x.
 const transactionIndex = "traces-apm*,apm-*-transaction*"
+
+// APM API віддає зразки сотнями, і кожен потрапляє в контекст LLM, тому дефолт
+// малий, а максимум обмежений.
+const (
+	DefaultSampleLimit = 50
+	MaxSampleLimit     = 500
+)
 
 // sampleFields — те, чого не віддає /transactions/traces/samples, але без чого
 // доводиться викликати get_trace лише щоб дізнатися «200 чи 403».
@@ -35,6 +43,7 @@ type SampleParams struct {
 	Kuery           string
 	SampleRangeFrom string
 	SampleRangeTo   string
+	Limit           int
 }
 
 type sampleRow struct {
@@ -53,6 +62,7 @@ type samplesResult struct {
 	Transaction string      `json:"transaction"`
 	Kuery       string      `json:"kuery,omitempty"`
 	Count       int         `json:"count"`
+	Available   int         `json:"availableCount,omitempty"`
 	Samples     []sampleRow `json:"samples"`
 	Note        string      `json:"note,omitempty"`
 	Hint        string      `json:"hint,omitempty"`
@@ -73,23 +83,49 @@ func FetchTransactionSamples(client *kibana.Client, p SampleParams) (string, err
 		return "", err
 	}
 
+	rows := parseTraceSamples(raw)
+	// Обрізаємо до доповнення: доповнюємо лише те, що справді повернемо.
+	available := len(rows)
+	if limit := clampSampleLimit(p.Limit); available > limit {
+		rows = rows[:limit]
+	}
+
 	result := samplesResult{
 		Service:     p.Service,
 		Transaction: p.Transaction,
 		Kuery:       p.Kuery,
-		Samples:     parseTraceSamples(raw),
+		Count:       len(rows),
+		Samples:     rows,
 	}
-	result.Count = len(result.Samples)
 
 	if err := enrichSamples(client, result.Samples); err != nil {
 		result.Note = "statusCode/outcome/urlPath unavailable (Elasticsearch enrichment failed): " + err.Error()
 	}
-	if result.Count == 0 {
+	switch {
+	case result.Count == 0:
 		result.Hint = "No samples. Widen start/end, drop kuery, or check the transaction name against get_transactions."
-	} else {
+	case available > result.Count:
+		result.Available = available
+		result.Hint = fmt.Sprintf(
+			"Showing the first %d of %d samples. Narrow with kuery or sampleRangeFrom/To rather than raising limit (max %d) — every sample lands in the model context. Pass a traceId (plus transactionId as entryTransactionId) to get_trace for the span waterfall.",
+			result.Count, available, MaxSampleLimit,
+		)
+	default:
 		result.Hint = "Pass a traceId (plus transactionId as entryTransactionId) to get_trace for the span waterfall."
 	}
 	return formatJSON(result)
+}
+
+// clampSampleLimit тримає limit у межах [1, MaxSampleLimit]; 0 — дефолт.
+func clampSampleLimit(limit int) int {
+	switch {
+	case limit <= 0:
+		return DefaultSampleLimit
+	case limit > MaxSampleLimit:
+		return MaxSampleLimit
+	default:
+		return limit
+	}
 }
 
 // parseTraceSamples читає traceSamples з відповіді внутрішнього APM API.

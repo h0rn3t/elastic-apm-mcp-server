@@ -45,6 +45,9 @@ func registerGetTransactionSamples(s *server.MCPServer, client *kibana.Client) {
 		mcp.WithString("sampleRangeTo",
 			mcp.Description("Sample latency upper bound (microseconds)"),
 		),
+		mcp.WithNumber("limit",
+			mcp.Description(fmt.Sprintf("Max samples returned (1–%d, default %d). Every sample lands in the model context, so narrow with kuery or sampleRangeFrom/To instead of raising this", MaxSampleLimit, DefaultSampleLimit)),
+		),
 		kueryParam(),
 		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDestructiveHintAnnotation(false),
@@ -70,6 +73,7 @@ func registerGetTransactionSamples(s *server.MCPServer, client *kibana.Client) {
 			Kuery:           req.GetString("kuery", ""),
 			SampleRangeFrom: req.GetString("sampleRangeFrom", ""),
 			SampleRangeTo:   req.GetString("sampleRangeTo", ""),
+			Limit:           req.GetInt("limit", 0),
 		})
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("get transaction samples: %v", err)), nil

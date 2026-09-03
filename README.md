@@ -18,7 +18,7 @@
 | `check_service_errors` | Те саме, що `get_errors` |
 | `get_error_detail` | Один error-документ: `culprit`, ланцюжок `exception[]`, stacktrace, транзакція, URL |
 | `get_service_metrics` | Runtime-метрики (CPU, пам'ять тощо) |
-| `get_transaction_samples` | Зразки трейсів зі `status_code`, `outcome`, `url.path` і тривалістю |
+| `get_transaction_samples` | Зразки трейсів зі `status_code`, `outcome`, `url.path` і тривалістю (`limit` 1–500, за замовчуванням 50) |
 | `get_trace` | Повний waterfall span за trace ID |
 | `search_raw` | Сирий `_search` в Elasticsearch — escape hatch для полів, яких не віддає APM API |
 

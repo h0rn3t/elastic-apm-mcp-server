@@ -2,6 +2,7 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -123,6 +124,84 @@ func TestFetchTransactionSamplesSurvivesProxyFailure(t *testing.T) {
 	if !strings.Contains(got.Note, "403") {
 		t.Errorf("note = %q, want it to explain why the fields are missing", got.Note)
 	}
+}
+
+// APM API віддає зразки сотнями — без обрізання відповідь не влазить у контекст
+// LLM, а доповнення дарма тягне з ES усе, чого ми не повернемо.
+func TestFetchTransactionSamplesLimit(t *testing.T) {
+	tests := []struct {
+		name          string
+		limit         int
+		wantCount     int
+		wantAvailable int
+	}{
+		{name: "default caps at 50", limit: 0, wantCount: DefaultSampleLimit, wantAvailable: 120},
+		{name: "explicit limit", limit: 5, wantCount: 5, wantAvailable: 120},
+		{name: "limit above available returns all", limit: 500, wantCount: 120},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var enrichedIDs int
+			client := fakeKibana(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/console/proxy" {
+					var body struct {
+						Query struct {
+							Terms struct {
+								IDs []string `json:"transaction.id"`
+							} `json:"terms"`
+						} `json:"query"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+						t.Errorf("decode proxy body: %v", err)
+					}
+					enrichedIDs = len(body.Query.Terms.IDs)
+					_, _ = w.Write([]byte(`{"hits":{"hits":[]}}`))
+					return
+				}
+				_, _ = w.Write(manySamples(120))
+			})
+
+			text, err := FetchTransactionSamples(client, SampleParams{
+				Service: "ms-auth", Transaction: "POST /otp", Limit: tt.limit,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var got samplesResult
+			if err := json.Unmarshal([]byte(text), &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.Count != tt.wantCount || len(got.Samples) != tt.wantCount {
+				t.Errorf("count = %d, samples = %d, want %d", got.Count, len(got.Samples), tt.wantCount)
+			}
+			if got.Available != tt.wantAvailable {
+				t.Errorf("availableCount = %d, want %d", got.Available, tt.wantAvailable)
+			}
+			if enrichedIDs != tt.wantCount {
+				t.Errorf("enrichment asked ES for %d ids, want %d — only returned samples should be enriched", enrichedIDs, tt.wantCount)
+			}
+			if got.Samples[0].TraceID != "t0" {
+				t.Errorf("first sample = %q, want the first one APM returned", got.Samples[0].TraceID)
+			}
+		})
+	}
+}
+
+func manySamples(n int) []byte {
+	rows := make([]map[string]string, n)
+	for i := range rows {
+		rows[i] = map[string]string{
+			"traceId":       fmt.Sprintf("t%d", i),
+			"transactionId": fmt.Sprintf("x%d", i),
+		}
+	}
+	body, err := json.Marshal(map[string]any{"traceSamples": rows})
+	if err != nil {
+		panic(err)
+	}
+	return body
 }
 
 func TestFetchErrorDetailNoHits(t *testing.T) {

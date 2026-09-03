@@ -257,6 +257,7 @@ func cmdGetTransactionSamples(client *kibana.Client, args []string) int {
 	txType := fs.String("transaction-type", "request", "Тип транзакції")
 	sampleFrom := fs.String("sample-from", "", "Нижня межа затримки зразка (мкс)")
 	sampleTo := fs.String("sample-to", "", "Верхня межа затримки зразка (мкс)")
+	limit := fs.Int("limit", 0, fmt.Sprintf("Максимум зразків (1–%d, дефолт %d)", tools.MaxSampleLimit, tools.DefaultSampleLimit))
 	kuery := addKueryFlag(fs)
 	if code, ok := parseFlagsOnly(fs, args); !ok {
 		return code
@@ -274,6 +275,7 @@ func cmdGetTransactionSamples(client *kibana.Client, args []string) int {
 		Kuery:           *kuery,
 		SampleRangeFrom: *sampleFrom,
 		SampleRangeTo:   *sampleTo,
+		Limit:           *limit,
 	})
 	if err != nil {
 		return failf("get transaction samples: %v", err)
