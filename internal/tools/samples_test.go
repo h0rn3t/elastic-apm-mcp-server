@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+func TestSearchRawToolArraySchemasHaveItems(t *testing.T) {
+	tool := searchRawTool()
+	for _, name := range []string{"_source", "sort"} {
+		property, ok := tool.InputSchema.Properties[name]
+		if !ok {
+			t.Fatalf("%s property is missing", name)
+		}
+		schema, ok := property.(map[string]any)
+		if !ok {
+			t.Fatalf("%s schema has unexpected type %T", name, property)
+		}
+		// Клієнти (напр. VSCode) відхиляють масив без типізованого items,
+		// тому порожнього map[string]any{} тут недостатньо.
+		items, ok := schema["items"].(map[string]any)
+		if !ok {
+			t.Errorf("%s schema has no items object: %#v", name, property)
+			continue
+		}
+		if items["type"] == nil {
+			t.Errorf("%s items schema has no type: %#v", name, items)
+		}
+	}
+}
+
 func TestParseTraceSamples(t *testing.T) {
 	tests := []struct {
 		name string
