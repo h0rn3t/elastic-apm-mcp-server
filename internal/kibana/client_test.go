@@ -122,6 +122,100 @@ func TestSearchThroughConsoleProxy(t *testing.T) {
 	}
 }
 
+func TestSearchIncludesAggs(t *testing.T) {
+	var gotBody map[string]any
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Errorf("unmarshal body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"hits":{"hits":[]}}`))
+	})
+
+	aggs := map[string]any{"by_service": map[string]any{"terms": map[string]any{"field": "service.name"}}}
+	if _, err := c.Search(SearchRequest{Index: "apm*", Aggs: aggs}); err != nil {
+		t.Fatal(err)
+	}
+	gotAggs, ok := gotBody["aggs"].(map[string]any)
+	if !ok {
+		t.Fatalf("body has no aggs object: %v", gotBody)
+	}
+	byService, ok := gotAggs["by_service"].(map[string]any)
+	if !ok {
+		t.Fatalf("aggs.by_service missing: %v", gotAggs)
+	}
+	terms, ok := byService["terms"].(map[string]any)
+	if !ok || terms["field"] != "service.name" {
+		t.Errorf("aggs.by_service.terms = %v, want field service.name", byService)
+	}
+}
+
+func TestSearchOmitsAggsWhenNil(t *testing.T) {
+	var gotBody map[string]any
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Errorf("unmarshal body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"hits":{"hits":[]}}`))
+	})
+
+	if _, err := c.Search(SearchRequest{Index: "apm*"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := gotBody["aggs"]; ok {
+		t.Errorf("body has aggs = %v, want it omitted when unset", gotBody["aggs"])
+	}
+}
+
+func TestGetKibanaVersion(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Path; got != "/api/status" {
+			t.Errorf("path = %q, want /api/status", got)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		_, _ = w.Write([]byte(`{"version":{"number":"8.17.3"}}`))
+	})
+
+	got, err := c.GetKibanaVersion()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "8.17.3" {
+		t.Errorf("GetKibanaVersion() = %q, want 8.17.3", got)
+	}
+}
+
+func TestGetKibanaVersionErrors(t *testing.T) {
+	t.Run("http error", func(t *testing.T) {
+		c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+		})
+		if v, err := c.GetKibanaVersion(); err == nil {
+			t.Errorf("GetKibanaVersion() = %q, want an error for a 401 response", v)
+		}
+	})
+
+	t.Run("missing version number", func(t *testing.T) {
+		c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"version":{}}`))
+		})
+		if v, err := c.GetKibanaVersion(); err == nil {
+			t.Errorf("GetKibanaVersion() = %q, want an error when version.number is absent", v)
+		}
+	})
+}
 func TestSearchErrorStatus(t *testing.T) {
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

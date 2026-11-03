@@ -10,7 +10,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-var version = "0.0.1"
+var version = "2.0.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -18,6 +18,11 @@ func main() {
 
 // run перемикає між MCP stdio (за замовчуванням) і CLI-режимом.
 func run(args []string) int {
+	if len(args) > 0 && (args[0] == "version" || args[0] == "--version" || args[0] == "-V") {
+		fmt.Println(version)
+		return 0
+	}
+
 	client, err := kibana.NewClient()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "kibana client: %v\n", err)
@@ -51,7 +56,8 @@ Other tools:
 - get_transaction_samples — samples with status code, outcome, url.path and duration
 - get_trace — span waterfall for one traceId; only needed for bottleneck analysis
 - get_error_detail — culprit, exception chain, stacktrace of one error group
-- search_raw — raw Elasticsearch _search; the escape hatch for fields no other tool returns
+- search_raw — raw Elasticsearch _search with optional aggs for group-by analytics
+- get_version — binary and Kibana versions; run first when APM tools fail
 
 Narrowing results — every tool except get_trace and search_raw takes kuery, a KQL filter
 Elasticsearch applies server-side. Prefer it over fetching everything and filtering afterwards:
@@ -62,7 +68,7 @@ Elasticsearch applies server-side. Prefer it over fetching everything and filter
 Time ranges: ISO 8601 start/end, or period (15m, 1h, 6h, 24h, 7d), or hours (1–168).`),
 	)
 
-	tools.RegisterAll(s, client)
+	tools.RegisterAll(s, client, version)
 
 	if err := server.ServeStdio(s); err != nil {
 		fmt.Fprintln(os.Stderr, err)

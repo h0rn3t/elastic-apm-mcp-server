@@ -20,7 +20,8 @@
 | `get_service_metrics` | Runtime-метрики (CPU, пам'ять тощо) |
 | `get_transaction_samples` | Зразки трейсів зі `status_code`, `outcome`, `url.path` і тривалістю (`limit` 1–500, за замовчуванням 50) |
 | `get_trace` | Повний waterfall span за trace ID |
-| `search_raw` | Сирий `_search` в Elasticsearch — escape hatch для полів, яких не віддає APM API |
+| `search_raw` | Сирий `_search` в Elasticsearch з опційними `aggs` для групових аналітичних запитів |
+| `get_version` | Версії бінарника та Kibana, перевірка підключення |
 
 ### Фільтр `kuery`
 
@@ -45,7 +46,9 @@ get_transactions(serviceName: "ms-auth",
 окремої конфігурації не потрібно.
 
 `search_raw` приймає `index` (за замовчуванням `.ds-*apm*`), `query` (Query
-DSL), `_source`, `size` (1–1000, за замовчуванням 10) і `sort`. Шлях завжди
+DSL), `aggs` (агрегації: terms, avg/p95/p99 percentiles, date_histogram —
+виконуються на боці сервера, з `size: 0` коли потрібні лише бакети),
+`_source`, `size` (1–1000, за замовчуванням 10) і `sort`. Шлях завжди
 `<index>/_search`, а `index` перевіряється на допустимі символи — інші
 ендпоінти ES через цей інструмент недосяжні.
 
@@ -76,6 +79,9 @@ elastic-apm-mcp-server get-error-detail --service ms-auth --group-id abc123def45
 elastic-apm-mcp-server search-raw --index 'logs-apm.error*' --size 1 \
   --query '{"term":{"service.name":"ms-auth"}}' \
   --sort '[{"@timestamp":{"order":"desc"}}]'
+elastic-apm-mcp-server search-raw --index 'traces-apm*' --size 0 \
+  --aggs '{"by_service":{"terms":{"field":"service.name","size":20}}}'
+elastic-apm-mcp-server version   # версія бінарника, без звернення до Kibana
 ```
 
 `--kuery` доступний у всіх командах, крім `get-trace` і `search-raw`:
@@ -106,7 +112,7 @@ make install   # збирає та встановлює в /usr/local/bin/
 ### Go install
 
 ```bash
-go install github.com/h0rn3t/elastic-apm-mcp-server/cmd/elastic-apm-mcp-server@latest
+go install github.com/h0rn3t/elastic-apm-mcp-server/cmd/elastic-apm-mcp-server@v2.0.0
 ```
 
 ## Налаштування MCP

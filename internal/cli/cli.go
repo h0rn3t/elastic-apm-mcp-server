@@ -62,7 +62,8 @@ func printUsage(w io.Writer) {
   get-service-metrics        Runtime-метрики (CPU, пам'ять)
   get-transaction-samples    Зразки трейсів для транзакції (зі status_code/outcome/url)
   get-trace                  Waterfall трейсу за trace ID
-  search-raw                 Сирий _search в Elasticsearch (escape hatch)
+  search-raw                 Сирий _search в Elasticsearch (підтримує aggs)
+  version                    Версія бінарника (без звернення до Kibana)
 
 Сервер:
   mcp                        MCP-сервер через stdio (також за замовчуванням)
@@ -331,6 +332,7 @@ func cmdSearchRaw(client *kibana.Client, args []string) int {
 	fs := flag.NewFlagSet("search-raw", flag.ContinueOnError)
 	index := fs.String("index", tools.DefaultSearchIndex, "Індекс або патерн")
 	query := fs.String("query", "", `Query DSL, напр. '{"term":{"service.name":"ms-auth"}}'`)
+	aggs := fs.String("aggs", "", `Aggregations DSL, напр. '{"by_service":{"terms":{"field":"service.name","size":20}}}'`)
 	source := fs.String("source", "", "Поля _source через кому")
 	sortBy := fs.String("sort", "", `Сортування, напр. '[{"@timestamp":{"order":"desc"}}]'`)
 	size := fs.Int("size", kibana.DefaultSearchSize, fmt.Sprintf("Кількість хітів (1–%d)", kibana.MaxSearchSize))
@@ -343,6 +345,9 @@ func cmdSearchRaw(client *kibana.Client, args []string) int {
 		req.Source = strings.Split(*source, ",")
 	}
 	if err := unmarshalFlag("query", *query, &req.Query); err != nil {
+		return failf("%v", err)
+	}
+	if err := unmarshalFlag("aggs", *aggs, &req.Aggs); err != nil {
 		return failf("%v", err)
 	}
 	if err := unmarshalFlag("sort", *sortBy, &req.Sort); err != nil {

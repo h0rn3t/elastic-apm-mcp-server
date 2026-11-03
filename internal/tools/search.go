@@ -14,7 +14,7 @@ import (
 // .ds-logs-apm.error-*, .ds-metrics-apm-*) одним патерном.
 const DefaultSearchIndex = ".ds-*apm*"
 
-const searchToolDescription = `Escape hatch to Elasticsearch: run a raw _search against the APM indices through the Kibana console proxy (same credentials as every other tool). Use for what the internal APM API never returns — error.culprit, error.exception[].stacktrace[], arbitrary _source fields, exact term filters on any field. Prefer the dedicated tools when they answer the question; reach here instead of shelling out to curl. Read-only: the path is always <index>/_search, so no aggregations-only endpoints, no writes.`
+const searchToolDescription = `Escape hatch to Elasticsearch: run a raw _search against the APM indices through the Kibana console proxy (same credentials as every other tool). Use for what the internal APM API never returns — error.culprit, error.exception[].stacktrace[], arbitrary _source fields, exact term filters on any field. Pass aggs for server-side group-by analytics (terms, avg/p95 percentiles, date_histogram) instead of fetching hits. Prefer the dedicated tools when they answer the question; reach here instead of shelling out to curl. Read-only: the path is always <index>/_search, so no aggregations-only endpoints, no writes.`
 
 func registerSearchTools(s *server.MCPServer, client *kibana.Client) {
 	tool := searchRawTool()
@@ -24,6 +24,7 @@ func registerSearchTools(s *server.MCPServer, client *kibana.Client) {
 		raw, err := client.Search(kibana.SearchRequest{
 			Index:  req.GetString("index", DefaultSearchIndex),
 			Query:  args["query"],
+			Aggs:   args["aggs"],
 			Source: req.GetStringSlice("_source", nil),
 			Size:   req.GetInt("size", 0),
 			Sort:   args["sort"],
@@ -44,6 +45,9 @@ func searchRawTool() mcp.Tool {
 		mcp.WithDescription(searchToolDescription),
 		mcp.WithObject("query",
 			mcp.Description(`Elasticsearch query DSL, e.g. {"bool":{"filter":[{"term":{"service.name":"ms-auth"}},{"range":{"@timestamp":{"gte":"now-1h"}}}]}}. Omit to match everything`),
+		),
+		mcp.WithObject("aggs",
+			mcp.Description(`Elasticsearch aggregations DSL, e.g. {"by_service":{"terms":{"field":"service.name","size":20}},"p95_latency":{"percentiles":{"field":"transaction.duration.us","percents":[95,99]}}}. Runs server-side; combine with size 0 when only buckets are needed`),
 		),
 		mcp.WithString("index",
 			mcp.Description(`Index or index pattern. Default `+DefaultSearchIndex+`. Narrow it for speed: traces-apm* (transactions/spans), logs-apm.error* (errors), metrics-apm*`),

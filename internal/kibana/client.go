@@ -287,6 +287,7 @@ const indexAllowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 type SearchRequest struct {
 	Index  string   `json:"-"`
 	Query  any      `json:"query,omitempty"`
+	Aggs   any      `json:"aggs,omitempty"`
 	Source []string `json:"_source,omitempty"`
 	Size   int      `json:"size"`
 	Sort   any      `json:"sort,omitempty"`
@@ -346,4 +347,21 @@ func (c *Client) consoleProxy(esPath string, body, out any) error {
 		return err
 	}
 	return c.do(req, out)
+}
+
+// GetKibanaVersion повертає версію Kibana через публічний /api/status.
+// Потрібна для діагностики підключення: не залежить від APM-індексів.
+func (c *Client) GetKibanaVersion() (string, error) {
+	var out struct {
+		Version struct {
+			Number string `json:"number"`
+		} `json:"version"`
+	}
+	if err := c.request("/api/status", nil, &out); err != nil {
+		return "", err
+	}
+	if out.Version.Number == "" {
+		return "", errors.New("kibana status has no version.number")
+	}
+	return out.Version.Number, nil
 }
