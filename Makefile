@@ -1,5 +1,5 @@
 BINARY := elastic-apm-mcp-server
-VERSION := 2.0.0
+VERSION := 0.2.0
 
 .PHONY: build install clean test
 

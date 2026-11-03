@@ -112,7 +112,7 @@ make install   # збирає та встановлює в /usr/local/bin/
 ### Go install
 
 ```bash
-go install github.com/h0rn3t/elastic-apm-mcp-server/cmd/elastic-apm-mcp-server@v2.0.0
+go install github.com/h0rn3t/elastic-apm-mcp-server/cmd/elastic-apm-mcp-server@v0.2.0
 ```
 
 ## Налаштування MCP

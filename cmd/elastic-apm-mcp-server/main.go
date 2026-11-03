@@ -10,7 +10,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-var version = "2.0.0"
+var version = "0.2.0"
 
 func main() {
 	os.Exit(run(os.Args[1:]))

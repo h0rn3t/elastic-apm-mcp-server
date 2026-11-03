@@ -30,7 +30,7 @@ func newVersionClient(t *testing.T, status int, body string) *kibana.Client {
 func TestFetchVersionSuccess(t *testing.T) {
 	client := newVersionClient(t, http.StatusOK, `{"version":{"number":"8.17.3"}}`)
 
-	text, err := FetchVersion(client, "2.0.0")
+	text, err := FetchVersion(client, "0.2.0")
 	if err != nil {
 		t.Fatalf("FetchVersion() error = %v", err)
 	}
@@ -38,8 +38,8 @@ func TestFetchVersionSuccess(t *testing.T) {
 	if err := json.Unmarshal([]byte(text), &got); err != nil {
 		t.Fatalf("FetchVersion() returned invalid JSON: %v", err)
 	}
-	if got["binaryVersion"] != "2.0.0" {
-		t.Errorf("binaryVersion = %v, want 2.0.0", got["binaryVersion"])
+	if got["binaryVersion"] != "0.2.0" {
+		t.Errorf("binaryVersion = %v, want 0.2.0", got["binaryVersion"])
 	}
 	if got["kibanaVersion"] != "8.17.3" {
 		t.Errorf("kibanaVersion = %v, want 8.17.3", got["kibanaVersion"])
@@ -52,7 +52,7 @@ func TestFetchVersionSuccess(t *testing.T) {
 func TestFetchVersionUnreachable(t *testing.T) {
 	client := newVersionClient(t, http.StatusUnauthorized, `{"error":"unauthorized"}`)
 
-	text, err := FetchVersion(client, "2.0.0")
+	text, err := FetchVersion(client, "0.2.0")
 	if err != nil {
 		t.Fatalf("FetchVersion() error = %v, want the failure embedded in JSON", err)
 	}
